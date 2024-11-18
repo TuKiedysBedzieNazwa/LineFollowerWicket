@@ -1,20 +1,9 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SH110X.h>
-#include <ESP8266WiFi.h>
 
+#include <packetManager.h>
+#include <definitions.h>
 
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 128
-Adafruit_SH1107 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-WiFiClient tcpSocket;
-
-
-const char ssid[18] = "HUAWEI-E5186-74C8";
-const char pass[12] = "Q2JQF143707";
-const char tcpSocketIp[14] = "192.168.8.120";
-const unsigned short int tcpSocketPort = 8080;
 
 unsigned short int sensorVal = 0;
 unsigned long long int timer = 0;
@@ -22,109 +11,126 @@ unsigned long long int timer = 0;
 bool isLoading = true;
 bool isConnectedToWifi = false;
 bool isConnectedToTcpSocket = false;
-
-
-const byte deviceId = 0b00000001 << 3;
-enum messageType {
-	reset = 0b00000000,
-	fireSensor = 0b00000001,
-	ping = 0b00000010
-};
-byte encodePacket(messageType type){
-	return deviceId | type;
-}
-messageType decodePacket(byte packet){
-	return ( messageType )( packet ^ deviceId );
-}
+bool isLocked = true;
 
 
 void timedTasks(){
 	isConnectedToWifi = WiFi.isConnected();
-	isConnectedToTcpSocket = tcpSocket.connected();
+	isConnectedToTcpSocket = TCP_SOCKET.connected();
 
 	if(!isConnectedToWifi || !isConnectedToTcpSocket)
 		isLoading = true;
 }
 
 void displayData(){
-	display.clearDisplay();
+	DEVICE_DISPLAY.clearDisplay();
+	DEVICE_DISPLAY.setCursor(0,0);
 
-	display.setCursor(0,0);
-	display.print("analog: ");
-	display.println(analogRead(A0));
-	display.print("ip: ");
-	display.println(WiFi.localIP());
-	display.print("gateway: ");
-	display.println(WiFi.gatewayIP());
-	display.print("socket con/ava: ");
-	display.print(tcpSocket.connected());
-	display.println(tcpSocket.available());
-	display.print("time: ");
-	display.println((int)timer / 1000);
-	display.print("tcp socket read: ");
-	display.println(tcpSocket.read());
+	DEVICE_DISPLAY.print("ip: ");
+	DEVICE_DISPLAY.println(WiFi.localIP());
+	DEVICE_DISPLAY.print("id: ");
+	DEVICE_DISPLAY.println(DEVICE_ID >> 3);
 
-	display.display();
+	if(isLocked){
+		DEVICE_DISPLAY.println("Device is locked");
+	}
+	else {
+		DEVICE_DISPLAY.print("analog: ");
+		DEVICE_DISPLAY.println(analogRead(A0));
+	}
+
+	DEVICE_DISPLAY.display();
 }
 
 void loading(){
-	display.clearDisplay();
+	DEVICE_DISPLAY.clearDisplay();
 
-	display.setCursor(0,0);
-	display.println("loading ...");
-	display.println("Tasks to Do: ");
+	DEVICE_DISPLAY.setCursor(0,0);
+	DEVICE_DISPLAY.println("Loading, Tasks to Do:");
 
 	if(isConnectedToWifi && isConnectedToTcpSocket)
 		isLoading = false;
+
 	if(!isConnectedToWifi)
-		display.println("- wifi");
-	if(!isConnectedToTcpSocket){
-		display.println("- tcp socket");
-		tcpSocket.connect(tcpSocketIp, tcpSocketPort);
-		tcpSocket.setNoDelay(true);
+		DEVICE_DISPLAY.println("- wifi");
+
+	if(isConnectedToWifi && !isConnectedToTcpSocket){
+		DEVICE_DISPLAY.println("- tcp socket");
+		TCP_SOCKET.connect(TCP_SOCKET_IP, TCP_SOCKET_PORT);
+		TCP_SOCKET.setNoDelay(true);
 	}
 
-	display.display();
-	delay(2000);
+	if(isConnectedToTcpSocket)
+		TCP_SOCKET.write(encodePacket(messageType::ping));
+
+	DEVICE_DISPLAY.display();
+	delay(1000);
 }
 
 void tcpSocketHandler(){
 	if(!isConnectedToTcpSocket) return;
 
-	if(tcpSocket.available()){ }
+	if(TCP_SOCKET.available()){
+		switch(decodePacket(TCP_SOCKET.read())){
+			case messageType::lock:
+				isLocked = true;
+			break;
+			case messageType::unlock:
+				isLocked = false;
+			break;
+		}
+	}
 }
 
 
 void setup(){
 	Serial.begin(115200);
 	Wire.begin(2, 14);
-	display.begin();
-	display.setTextSize(1);
-	display.setTextColor(SH110X_WHITE);
+	DEVICE_DISPLAY.begin();
+	DEVICE_DISPLAY.setTextSize(1);
+	DEVICE_DISPLAY.setTextColor(SSD1306_WHITE);
 
 	pinMode(A0, INPUT);
 
 	WiFi.mode(WIFI_STA);
-	WiFi.begin(ssid, pass);
-	tcpSocket.connect(tcpSocketIp, tcpSocketPort);
-	tcpSocket.setNoDelay(true);
+	WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+	TCP_SOCKET.connect(TCP_SOCKET_IP, TCP_SOCKET_PORT);
+	TCP_SOCKET.setNoDelay(true);
+
+	pinMode(10, INPUT);
+	pinMode(12, OUTPUT);
+	pinMode(13, OUTPUT);
 }
 
 void loop(){
 	timer = millis();
 
-	sensorVal = analogRead(A0);
-	if(sensorVal > 200){
-		if (isConnectedToTcpSocket){
-			tcpSocket.write(encodePacket(messageType::fireSensor));
+	if(!isLocked){
+
+		sensorVal = analogRead(A0);
+		if(sensorVal > 700){
+			digitalWrite(12, LOW);
+			digitalWrite(13, LOW);
+
+			if (isConnectedToTcpSocket){
+				TCP_SOCKET.write(encodePacket(messageType::fireSensor));
+				isLocked = true;
+			}
 		}
+	}
+	else{
+		digitalWrite(12, HIGH);
+		digitalWrite(13, HIGH);
 	}
 
 	tcpSocketHandler();
 
-	// if(timer % 2 == 0){
-	timedTasks();
-	if(isLoading) loading();
-	else displayData();
-	// }
+	if(timer % 10 == 0){
+		timedTasks();
+
+		if(isLoading)
+			loading();
+		else
+			displayData();
+	}
 }
