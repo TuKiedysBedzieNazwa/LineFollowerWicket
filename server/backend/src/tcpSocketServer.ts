@@ -10,7 +10,8 @@ import { messageType } from "../utils/enums";
 
 const socketClients: {
 	socket: net.Socket,
-	id?: number
+	id?: number,
+	areLocked: boolean
 }[] = [];
 
 export function sendMessageToAllTcpClients(message: Uint8Array): void{
@@ -21,11 +22,20 @@ export function sendMessageToAllTcpClients(message: Uint8Array): void{
 
 export function getAllTcpClients(){
 	return socketClients.map((socketData) => {
+		const {socket, ...rest} = socketData;
+
 		return {
-			id: socketData.id,
+			...rest,
 			address: socketData.socket.remoteAddress
 		}
 	});
+}
+
+export function changeWicketLockState(state: boolean){
+	socketClients.map((_, i) => {
+		socketClients[i].areLocked = state
+	})
+	sendMessageToAllWsClients(encodePacket(messageType.updateWickets).buffer)
 }
 
 const getSocketDataBySocket = (socket: net.Socket) => {
@@ -34,23 +44,27 @@ const getSocketDataBySocket = (socket: net.Socket) => {
 	}).filter((elemenet) => elemenet !== undefined)[0];
 }
 
-
-const messageTypesHangler: {[key in messageType]?: (socket: net.Socket, decodedData: packetDataT) => void} = {
+const messageTypesHandler: {[key in messageType]?: (socket: net.Socket, decodedData: packetDataT) => void} = {
 	[messageType.fireSensor]: (socket, decodedData) => {
 
 		if(decodedData.deviceId === 0){
 			startTimer();
-			sendMessageToAllWsClients(encodePacket(messageType.fireSensor).buffer)
+			sendMessageToAllWsClients(encodePacket(messageType.fireSensor).buffer);
 		}
 		else createTimestamp();
 
 		if(decodedData.deviceId === 3){
 			stopTimer();
+			sendMessageToAllTcpClients(encodePacket(messageType.lock));
+			changeWicketLockState(true);
+		}
+		else {
+			const socketIndex = socketClients.indexOf(getSocketDataBySocket(socket));
+			socketClients[socketIndex].areLocked = true;
 		}
 
-		sendMessageToAllWsClients(encodePacket(messageType.updateTimer).buffer)
-
-		console.log("fire sensor")
+		sendMessageToAllWsClients(encodePacket(messageType.updateTimer).buffer);
+		sendMessageToAllWsClients(encodePacket(messageType.updateWickets).buffer);
 	},
 	[messageType.ping]: (socket, decodedData) => {
 
@@ -66,7 +80,7 @@ export default function tcpSocketServer(tcpHost: string, tcpPort: number): void{
 
 	const server = net.createServer((socket: net.Socket) => {
 		console.log('[tcp socket]: Client connected:', socket.remoteAddress, socket.remotePort);
-		socketClients.push({ socket: socket });
+		socketClients.push({ socket: socket, areLocked: true });
 		console.log("[tcp socket]: ", socketClients.length);
 
 
@@ -79,8 +93,8 @@ export default function tcpSocketServer(tcpHost: string, tcpPort: number): void{
 
 			const decodedData = decodePacket(data);
 
-			messageTypesHangler[decodedData.messageType] !== undefined ?
-				messageTypesHangler[decodedData.messageType]!(socket, decodedData) :
+			messageTypesHandler[decodedData.messageType] !== undefined ?
+				messageTypesHandler[decodedData.messageType]!(socket, decodedData) :
 				console.log('[web socket]: unknown messageType');
 		});
 

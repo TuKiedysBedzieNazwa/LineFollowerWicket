@@ -17,7 +17,7 @@ export default function expressServer(exPort: number){
 
 	server.get("/timer", (req: Request, res: Response) => {
 		res.send(getTime());
-	})
+	});
 
 	server.listen(exPort, () => {
 		console.log(`[backend server]: Server is running at http://localhost:${exPort}`);

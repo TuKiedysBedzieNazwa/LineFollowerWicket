@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from "react"
 
 import { decodePacket, encodePacket } from "../../utils/packetManager";
 
+import lock from "../../assets/lock.svg";
+
 import { messageType } from "../../utils/enums";
 import { serverIp } from "../../utils/config";
 
@@ -9,12 +11,13 @@ export default function Admin(){
 
 	const wsConn = useRef<WebSocket>();
 	const [wickets, setWickets] = useState<Array<any>>();
+	const [isStopDisabled, setIsStopDisabled] = useState<boolean>(false);
 
 	const getWickets = async () => {
 		await fetch(`/api/tcpClients`).then(
 			res => res.json()
 		).then(
-			res => setWickets(res)
+			res => setWickets(res.sort((a: any, b: any) => a.id - b.id))
 		);
 	}
 
@@ -40,6 +43,15 @@ export default function Admin(){
 
 	useEffect(() => { getWickets() }, []);
 
+	useEffect(() => {
+
+		const shouldDisableStop = wickets && wickets?.map((wicket) => {
+			if(!wicket.areLocked)
+				return false;
+		}).filter((elemenet) => elemenet !== undefined)[0];
+
+		setIsStopDisabled(shouldDisableStop === undefined);
+	}, [ wickets ]);
 
 	return <div className="rootDiv">
 		<div className="nav">
@@ -54,8 +66,11 @@ export default function Admin(){
 						{
 							wickets && wickets.map((wicket, i) =>
 								<div className="border-b-2 rounded-lg p-3 flex justify-between" key={i}>
-									<div>
-										{ wicket.id }
+									<div className="flex w-12">
+										<span className="w-7">
+											{ wicket.id }
+										</span>
+										{ wicket.areLocked && <img src={lock} className="w-4" /> }
 									</div>
 									<div>
 										{ wicket.address }
@@ -82,6 +97,7 @@ export default function Admin(){
 							onClick={() => {
 								wsConn.current && wsConn.current.send(encodePacket(messageType.lock));
 							}}
+							disabled={isStopDisabled}
 						>
 							stop
 						</button>

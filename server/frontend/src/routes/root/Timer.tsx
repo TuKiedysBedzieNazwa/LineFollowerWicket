@@ -38,7 +38,7 @@ export default function Timer({ tState, finishTime }: {
 			}
 
 		return () => clearInterval(interval.current);
-	}, [tState]);
+	}, [tState, finishTime.current]);
 
 	let {mins, secs, ms} = formatTime(timer);
 
@@ -57,7 +57,7 @@ export default function Timer({ tState, finishTime }: {
 		}
 	}
 
-	return <div className="text-10xl flex items-stretch justify-center tracking-widest mb-20 mr-32">
+	return <div className="text-10xl flex items-stretch justify-center tracking-widest mb-20">
 		<AnimatePresence>
 			{
 				mins > 0 && <>

@@ -1,10 +1,11 @@
 import { WebSocketServer } from "ws";
 import type WebSocket from "ws";
 
-import { messageType } from "../utils/enums";
 import { decodePacket, encodePacket } from "../utils/packetManager";
-import { sendMessageToAllTcpClients } from "./tcpSocketServer";
+import { sendMessageToAllTcpClients, changeWicketLockState } from "./tcpSocketServer";
 import { resetTimer, stopTimer } from "../utils/timer";
+
+import { messageType } from "../utils/enums";
 
 
 const webSocketClients: WebSocket[] = [];
@@ -18,10 +19,14 @@ const messageTypesHangler: {[key in messageType]?: () => void} = {
 	[messageType.lock]: () => {
 		sendMessageToAllTcpClients(encodePacket(messageType.lock));
 		stopTimer();
+		sendMessageToAllWsClients(encodePacket(messageType.updateTimer).buffer)
+		changeWicketLockState(true);
 	},
 	[messageType.unlock]: () => {
 		sendMessageToAllTcpClients(encodePacket(messageType.unlock));
 		resetTimer();
+		sendMessageToAllWsClients(encodePacket(messageType.updateTimer).buffer);
+		changeWicketLockState(false);
 	}
 }
 
