@@ -2,5 +2,6 @@ import { messageType } from "./enums"
 
 export type packetDataT = {
 	messageType: messageType,
-	deviceId: number
+	deviceId: number,
+	value: number
 }

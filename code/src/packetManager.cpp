@@ -3,8 +3,8 @@
 
 
 
-byte encodePacket(messageType type){
-	return DEVICE_ID | type;
+byte encodePacket(messageType type, byte value){
+	return (value << 6) | DEVICE_ID | type;
 }
 
 messageType decodePacket(byte packet){

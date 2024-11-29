@@ -6,7 +6,6 @@ import { decodePacket } from "../../utils/packetManager";
 import formatTime from "./formatTime";
 
 import { messageType, timerState } from "../../utils/enums";
-import { serverIp } from "../../utils/config";
 
 export default function Root() {
 
@@ -44,7 +43,7 @@ export default function Root() {
 	useEffect(() => {getTime()}, [])
 
 	useEffect(() => {
-		const ws = new WebSocket(`ws://${serverIp}:8081`);
+		const ws = new WebSocket(`ws://10.0.0.1:8081/`);
 		ws.binaryType = "arraybuffer";
 
 		ws.onmessage = (message) => {

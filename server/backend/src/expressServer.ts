@@ -6,10 +6,6 @@ import { getTime } from "../utils/timer";
 
 export default function expressServer(exPort: number){
 	const server: Express = express();
-	
-	server.get("/", (req: Request, res: Response) => {
-		res.send("Express + TypeScript Server");
-	});
 
 	server.get("/tcpClients", (req: Request, res: Response) => {
 		res.send(getAllTcpClients());

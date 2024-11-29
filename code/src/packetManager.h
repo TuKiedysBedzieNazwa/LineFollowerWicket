@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 
-const byte DEVICE_ID = 0b00000000 << 3;
+const byte DEVICE_ID = 0b00000011 << 3;
 
 enum messageType {
 	unlock = 0b00000000,
@@ -11,6 +11,6 @@ enum messageType {
 	lock = 0b00000100,
 };
 
-byte encodePacket(messageType type);
+byte encodePacket(messageType type, byte value=0b00000000);
 
 messageType decodePacket(byte packet);

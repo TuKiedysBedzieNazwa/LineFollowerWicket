@@ -3,9 +3,10 @@ import { useEffect, useState, useRef } from "react"
 import { decodePacket, encodePacket } from "../../utils/packetManager";
 
 import lock from "../../assets/lock.svg";
+import batteryFull from "../../assets/batteryFull.svg";
+import batteryEmpty from "../../assets/batteryEmpty.svg";
 
 import { messageType } from "../../utils/enums";
-import { serverIp } from "../../utils/config";
 
 export default function Admin(){
 
@@ -26,7 +27,7 @@ export default function Admin(){
 	}
 
 	useEffect(() => {
-		const ws = new WebSocket(`ws://${serverIp}:8081`);
+		const ws = new WebSocket(`ws://10.0.0.1:8081/`);
 		ws.binaryType = "arraybuffer";
 
 		// ws.onopen = () => {}
@@ -66,11 +67,18 @@ export default function Admin(){
 						{
 							wickets && wickets.map((wicket, i) =>
 								<div className="border-b-2 rounded-lg p-3 flex justify-between" key={i}>
-									<div className="flex w-12">
+									<div className="flex w-18 items-center justify-center">
 										<span className="w-7">
 											{ wicket.id }
 										</span>
-										{ wicket.areLocked && <img src={lock} className="w-4" /> }
+										<div className="w-10 h-5 flex items-center justify-center">
+											{
+												wicket.batteryStatus ?
+												<img src={batteryFull} className="h-8" /> :
+												<img src={batteryEmpty} className="h-8" />
+											}
+										</div>
+										{ wicket.areLocked && <img src={lock} className="ml-2 h-5 mb-0.5" /> }
 									</div>
 									<div>
 										{ wicket.address }
@@ -91,7 +99,7 @@ export default function Admin(){
 								wsConn.current && wsConn.current.send(encodePacket(messageType.unlock));
 							}}
 						>
-							reset
+							Start
 						</button>
 						<button className="bg-red-700 text-white"
 							onClick={() => {
@@ -99,7 +107,7 @@ export default function Admin(){
 							}}
 							disabled={isStopDisabled}
 						>
-							stop
+							Stop
 						</button>
 					</div>
 				</div>

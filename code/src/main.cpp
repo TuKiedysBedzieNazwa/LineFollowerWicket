@@ -30,6 +30,8 @@ void displayData(){
 	DEVICE_DISPLAY.println(WiFi.localIP());
 	DEVICE_DISPLAY.print("id: ");
 	DEVICE_DISPLAY.println(DEVICE_ID >> 3);
+	DEVICE_DISPLAY.print("battery: ");
+	DEVICE_DISPLAY.println(digitalRead(10));
 
 	if(isLocked){
 		DEVICE_DISPLAY.println("Device is locked");
@@ -125,7 +127,7 @@ void loop(){
 
 	tcpSocketHandler();
 
-	if(timer % 10 == 0){
+	if(timer % 50 == 0){
 		timedTasks();
 
 		if(isLoading)
@@ -133,4 +135,7 @@ void loop(){
 		else
 			displayData();
 	}
+	if(isLocked && isConnectedToTcpSocket && timer % 7000 == 0)
+		TCP_SOCKET.write(encodePacket(messageType::batteryStatus, digitalRead(10)));
+
 }

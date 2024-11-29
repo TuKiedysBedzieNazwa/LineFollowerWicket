@@ -11,7 +11,8 @@ import { messageType } from "../utils/enums";
 const socketClients: {
 	socket: net.Socket,
 	id?: number,
-	areLocked: boolean
+	areLocked: boolean,
+	batteryStatus: boolean
 }[] = [];
 
 export function sendMessageToAllTcpClients(message: Uint8Array): void{
@@ -51,7 +52,7 @@ const messageTypesHandler: {[key in messageType]?: (socket: net.Socket, decodedD
 			startTimer();
 			sendMessageToAllWsClients(encodePacket(messageType.fireSensor).buffer);
 		}
-		else createTimestamp();
+		else if(decodedData.deviceId !== 3) createTimestamp();
 
 		if(decodedData.deviceId === 3){
 			stopTimer();
@@ -68,10 +69,19 @@ const messageTypesHandler: {[key in messageType]?: (socket: net.Socket, decodedD
 	},
 	[messageType.ping]: (socket, decodedData) => {
 
-		const socketToUpdate = getSocketDataBySocket(socket);
+		const socketIndex = socketClients.indexOf(getSocketDataBySocket(socket));
 
-		socketClients[socketClients.indexOf(socketToUpdate)].id = decodedData.deviceId
+		socketClients[socketIndex].id = decodedData.deviceId
 		sendMessageToAllWsClients(encodePacket(messageType.updateWickets).buffer)
+	},
+	[messageType.batteryStatus]: (socket, decodedData) => {
+
+		const socketIndex = socketClients.indexOf(getSocketDataBySocket(socket));
+
+		if(socketClients[socketIndex].batteryStatus !== Boolean(decodedData.value)){
+			socketClients[socketIndex].batteryStatus = Boolean(decodedData.value)
+			sendMessageToAllWsClients(encodePacket(messageType.updateWickets).buffer)
+		}
 	}
 }
 
@@ -80,7 +90,7 @@ export default function tcpSocketServer(tcpHost: string, tcpPort: number): void{
 
 	const server = net.createServer((socket: net.Socket) => {
 		console.log('[tcp socket]: Client connected:', socket.remoteAddress, socket.remotePort);
-		socketClients.push({ socket: socket, areLocked: true });
+		socketClients.push({ socket: socket, areLocked: true, batteryStatus: false });
 		console.log("[tcp socket]: ", socketClients.length);
 
 
@@ -95,7 +105,7 @@ export default function tcpSocketServer(tcpHost: string, tcpPort: number): void{
 
 			messageTypesHandler[decodedData.messageType] !== undefined ?
 				messageTypesHandler[decodedData.messageType]!(socket, decodedData) :
-				console.log('[web socket]: unknown messageType');
+				console.log('[tcp socket]: unknown messageType');
 		});
 
 		socket.on('error', (err) => {
